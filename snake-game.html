@@ -557,9 +557,14 @@
         </div>
 
         <!-- 排行榜按钮 -->
-        <button class="home-btn btn-leaderboard" id="btnHomeLeaderboard">
-            🏆 查看排行榜
-        </button>
+        <div style="display:flex;gap:10px;width:100%;max-width:320px;">
+            <button class="home-btn btn-leaderboard" id="btnHomeLeaderboard" style="flex:1;">
+                🏆 查看排行榜
+            </button>
+            <button class="home-btn btn-music-home" id="btnHomeMusic" style="flex:1;background:rgba(255,255,255,0.06);">
+                🔊 音乐
+            </button>
+        </div>
 
         <div class="tip">💡 每吃一个果实 = 1 分 | 达到目标分数即通关</div>
     </div>
@@ -605,6 +610,7 @@
         <!-- 底部按钮 -->
         <div class="bottom-btns">
             <button class="action-btn btn-pause" id="btnPause">⏯ 暂停</button>
+            <button class="action-btn btn-music" id="btnMusic">🔊 音乐</button>
             <button class="action-btn btn-restart" id="btnRestart">🔄 重新开始</button>
             <button class="action-btn btn-back" id="btnBack">🏠 返回首页</button>
         </div>
@@ -756,6 +762,173 @@
         }
         function sfxTurn() { playBeep(300, 0.05, 'sine', 0.04); }
 
+        // ============ 背景音乐系统 (8-bit 风格) ============
+        let musicEnabled = true;
+        let musicOscillators = [];
+        let musicGains = [];
+        let musicTimeoutIds = [];
+        let musicBpm = 140; // BPM
+
+        function stopAllMusic() {
+            musicTimeoutIds.forEach(id => clearTimeout(id));
+            musicTimeoutIds = [];
+            musicOscillators.forEach(osc => { try { osc.stop(); } catch(e) {} });
+            musicOscillators = [];
+            musicGains.forEach(gain => { try { gain.disconnect(); } catch(e) {} });
+            musicGains = [];
+        }
+
+        // 8-bit 贪吃蛇背景音乐 - 循环播放
+        function playNote(freq, startTime, duration, vol = 0.06) {
+            try {
+                const ctx = getAudioCtx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(freq, startTime);
+                gain.gain.setValueAtTime(vol, startTime);
+                gain.gain.setValueAtTime(vol * 0.6, startTime + duration * 0.7);
+                gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(startTime);
+                osc.stop(startTime + duration + 0.01);
+                musicOscillators.push(osc);
+                musicGains.push(gain);
+            } catch(e) {}
+        }
+
+        // 旋律1: 轻松愉快的主旋律 (16小节)
+        // 旋律2: 紧张刺激的变奏 (16小节)
+        const melody1 = [
+            // [频率, 时长(拍)]
+            [523, 0.5], [659, 0.5], [784, 0.5], [659, 0.5], // C E G E
+            [784, 0.5], [880, 0.5], [1047, 0.5], [880, 0.5], // G A C A
+            [1047, 0.5], [784, 0.5], [659, 0.5], [523, 0.5], // C G E C
+            [587, 0.5], [698, 0.5], [784, 1.0],              // D F G
+            [523, 0.5], [659, 0.5], [784, 0.5], [1047, 0.5], // C E G C
+            [1175, 0.5], [1047, 0.5], [880, 0.5], [784, 0.5],// D C A G
+            [659, 0.5], [784, 0.5], [880, 0.5], [659, 0.5],  // E G A E
+            [523, 0.5], [587, 0.5], [659, 1.0],              // C D E
+        ];
+
+        const melody2 = [
+            [1047, 0.5], [1175, 0.5], [1319, 0.5], [1175, 0.5],
+            [1047, 0.5], [880, 0.5], [784, 0.5], [659, 0.5],
+            [784, 0.25], [880, 0.25], [784, 0.25], [659, 0.25], [523, 0.5], [440, 0.5],
+            [523, 0.5], [659, 0.5], [784, 0.5], [659, 0.5],
+            [880, 0.5], [1047, 0.5], [1175, 0.5], [1319, 0.5],
+            [1568, 0.5], [1319, 0.5], [1047, 0.5], [784, 0.5],
+            [659, 0.25], [784, 0.25], [659, 0.25], [523, 0.25], [440, 0.5], [392, 0.5],
+            [523, 1.0],
+        ];
+
+        // 低音贝斯线
+        const bassLine = [
+            [131, 1], [165, 1], [196, 1], [165, 1],
+            [196, 1], [220, 1], [262, 1], [220, 1],
+            [262, 1], [196, 1], [165, 1], [131, 1],
+            [147, 1], [175, 1], [196, 1], [165, 0.5], [196, 0.5],
+        ];
+
+        // 鼓点 (用短噪声模拟)
+        function playDrumBeat(startTime) {
+            try {
+                const ctx = getAudioCtx();
+                const bufferSize = ctx.sampleRate * 0.05;
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 4);
+                }
+                const source = ctx.createBufferSource();
+                const gain = ctx.createGain();
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'highpass';
+                filter.frequency.setValueAtTime(200, startTime);
+                source.buffer = buffer;
+                gain.gain.setValueAtTime(0.06, startTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.05);
+                source.connect(filter);
+                filter.connect(gain);
+                gain.connect(ctx.destination);
+                source.start(startTime);
+                source.stop(startTime + 0.06);
+                musicOscillators.push(source);
+                musicGains.push(gain, filter);
+            } catch(e) {}
+        }
+
+        function playMusicLoop() {
+            if (!musicEnabled || gamePaused) return;
+            stopAllMusic();
+            const ctx = getAudioCtx();
+            const now = ctx.currentTime;
+            const beatDuration = 60 / musicBpm;
+            const totalBeats = Math.max(melody1.length + 1, bassLine.length);
+            const loopDuration = totalBeats * beatDuration;
+
+            // 播放旋律
+            melody1.forEach(([freq, beats], i) => {
+                const startTime = now + melody1.slice(0, i).reduce((sum, m) => sum + m[1], 0) * beatDuration;
+                playNote(freq, startTime, beats * beatDuration * 0.8, 0.05);
+            });
+
+            // 播放贝斯
+            bassLine.forEach(([freq, beats], i) => {
+                const startTime = now + bassLine.slice(0, i).reduce((sum, b) => sum + b[1], 0) * beatDuration;
+                playNote(freq, startTime, beats * beatDuration * 0.9, 0.04);
+            });
+
+            // 播放鼓点 (每拍)
+            for (let i = 0; i < totalBeats; i++) {
+                const drumTime = now + i * beatDuration;
+                playDrumBeat(drumTime);
+                // 第2、4拍加军鼓感觉
+                if (i % 2 === 1) {
+                    const drumTime2 = drumTime + beatDuration * 0.25;
+                    playDrumBeat(drumTime2);
+                }
+            }
+
+            // 循环
+            const loopId = setTimeout(() => {
+                playMusicLoop();
+            }, loopDuration * 1000);
+            musicTimeoutIds.push(loopId);
+        }
+
+        function startMusic() {
+            if (!musicEnabled) return;
+            stopAllMusic();
+            playMusicLoop();
+        }
+
+        function stopMusic() {
+            stopAllMusic();
+        }
+
+        function toggleMusic() {
+            musicEnabled = !musicEnabled;
+            const label = musicEnabled ? '🔊 音乐' : '🔇 音乐';
+            const btn = document.getElementById('btnMusic');
+            if (btn) btn.textContent = label;
+            const btnHome = document.getElementById('btnHomeMusic');
+            if (btnHome) btnHome.textContent = label;
+            if (musicEnabled && gameRunning && !gamePaused) {
+                startMusic();
+            } else {
+                stopMusic();
+            }
+            try { localStorage.setItem('snakeMusicEnabled', musicEnabled ? '1' : '0'); } catch(e) {}
+        }
+
+        // 加载音乐设置
+        try {
+            const saved = localStorage.getItem('snakeMusicEnabled');
+            if (saved === '0') musicEnabled = false;
+        } catch(e) {}
+
         // ============ 粒子系统 ============
         function spawnParticles(x, y, color, count = 8) {
             for (let i = 0; i < count; i++) {
@@ -842,6 +1015,7 @@
             initGame();
             draw();
             gameLoopId = setInterval(gameStep, GAME_SPEED);
+            startMusic(); // 启动背景音乐
         }
 
         // ============ 游戏逻辑 ============
@@ -943,6 +1117,7 @@
 
         function gameOver() {
             gameRunning = false;
+            stopMusic(); // 停止背景音乐
             sfxDie();
             spawnParticles(snake[0].x, snake[0].y, '#ff4444', 20);
 
@@ -965,6 +1140,7 @@
         function gameWin() {
             gameRunning = false;
             gameWon = true;
+            stopMusic(); // 停止背景音乐
             sfxWin();
             for (let i = 0; i < 30; i++) {
                 const rx = Math.floor(Math.random() * GRID_SIZE);
@@ -1000,6 +1176,7 @@
             gamePaused = !gamePaused;
             document.getElementById('btnPause').textContent = gamePaused ? '▶ 继续' : '⏯ 暂停';
             if (gamePaused) {
+                stopMusic(); // 暂停时停止音乐
                 draw();
                 ctx.fillStyle = 'rgba(0,0,0,0.5)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1007,6 +1184,8 @@
                 ctx.font = 'bold 32px "PingFang SC","Microsoft YaHei",sans-serif';
                 ctx.textAlign = 'center';
                 ctx.fillText('已暂停', canvas.width / 2, canvas.height / 2);
+            } else {
+                startMusic(); // 恢复时重新播放音乐
             }
         }
 
@@ -1147,7 +1326,15 @@
         // 游戏页面按钮
         document.getElementById('btnRestart').addEventListener('click', restartGame);
         document.getElementById('btnPause').addEventListener('click', togglePause);
+        document.getElementById('btnMusic').addEventListener('click', toggleMusic);
         document.getElementById('btnOverlayRestart').addEventListener('click', restartGame);
+
+        // 首页音乐按钮
+        document.getElementById('btnHomeMusic').addEventListener('click', toggleMusic);
+
+        // 初始化音乐按钮文字
+        document.getElementById('btnMusic').textContent = musicEnabled ? '🔊 音乐' : '🔇 音乐';
+        document.getElementById('btnHomeMusic').textContent = musicEnabled ? '🔊 音乐' : '🔇 音乐';
 
         // 防止双击缩放
         document.addEventListener('dblclick', (e) => {
@@ -1283,6 +1470,30 @@
 
         console.log('🐍 贪吃蛇游戏已就绪！');
         console.log('   首页选择难度 → 进入游戏 → 查看排行榜');
+
+        // 首次用户交互时解锁音频（解决浏览器自动播放限制）
+        let audioUnlocked = false;
+        function unlockAudio() {
+            if (audioUnlocked) return;
+            try {
+                const ctx = getAudioCtx();
+                if (ctx.state === 'suspended') {
+                    ctx.resume();
+                }
+                // 播放一个静音来解锁
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                gain.gain.value = 0.001;
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.001);
+                audioUnlocked = true;
+                console.log('🔓 音频已解锁');
+            } catch(e) {}
+        }
+        document.addEventListener('click', unlockAudio, { once: true });
+        document.addEventListener('touchstart', unlockAudio, { once: true });
 
         // 注册 Service Worker (PWA离线缓存)
         if ('serviceWorker' in navigator) {
