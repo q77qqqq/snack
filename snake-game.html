@@ -860,7 +860,8 @@
         }
 
         function playMusicLoop() {
-            if (!musicEnabled || gamePaused) return;
+            if (!musicEnabled) return;
+            if (gameRunning && gamePaused) return; // 只有游戏中暂停才不播放
             stopAllMusic();
             const ctx = getAudioCtx();
             const now = ctx.currentTime;
@@ -994,6 +995,7 @@
             leaderboardOverlay.classList.add('hidden');
             homePage.classList.remove('hidden');
             updateBestDisplay();
+            startMusic(); // 首页也播放背景音乐
         }
 
         function startGame(diff) {
@@ -1490,6 +1492,10 @@
                 osc.stop(ctx.currentTime + 0.001);
                 audioUnlocked = true;
                 console.log('🔓 音频已解锁');
+                // 解锁后，如果音乐开启且首页显示，启动首页音乐
+                if (musicEnabled && !homePage.classList.contains('hidden') && !gameRunning) {
+                    startMusic();
+                }
             } catch(e) {}
         }
         document.addEventListener('click', unlockAudio, { once: true });
