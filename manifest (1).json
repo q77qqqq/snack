@@ -1,0 +1,26 @@
+{
+  "background_color": "#0f0c29",
+  "dir": "ltr",
+  "display": "standalone",
+  "name": "贪吃蛇",
+  "orientation": "any",
+  "scope": "/",
+  "short_name": "贪吃蛇",
+  "start_url": "/",
+  "theme_color": "#302b63",
+  "icons": [
+    {
+      "src": "https://q77qqqq.github.io/icon-192.png",
+      "isSquare": false,
+      "isPng": true,
+      "isWebp": false,
+      "isJpg": false,
+      "width": 0,
+      "is512x512": false,
+      "is256x256": false,
+      "is192x192": false
+    }
+  ],
+  "id": "com.snake.game",
+  "description": "经典贪吃蛇手机游戏"
+}
